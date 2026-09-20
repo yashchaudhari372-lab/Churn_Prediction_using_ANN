@@ -120,8 +120,10 @@ elif page == "Explore Data":
     col = st.selectbox("Choose a feature", numeric_cols)
     hist_data = df[[col, "Exited"]].copy()
     hist_data["Exited"] = hist_data["Exited"].map({0: "Stayed", 1: "Churned"})
-    st.bar_chart(hist_data.groupby(pd.cut(hist_data[col], bins=15))["Exited"]
-                 .apply(lambda s: (s == "Churned").mean()))
+    binned = hist_data.groupby(pd.cut(hist_data[col], bins=15))["Exited"] \
+        .apply(lambda s: (s == "Churned").mean())
+    binned.index = binned.index.astype(str)  # Altair can't render Interval objects
+    st.bar_chart(binned)
 
     st.subheader("Correlation with churn (numeric features)")
     corr = df.select_dtypes(include=[np.number]).corr()["Exited"].drop("Exited").sort_values()
