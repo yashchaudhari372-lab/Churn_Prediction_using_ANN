@@ -1,6 +1,5 @@
-Flask
-tensorflow-cpu
-keras
-numpy
-pandas
+tensorflow
 scikit-learn
+pandas
+numpy
+streamlit
