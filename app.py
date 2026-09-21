@@ -21,7 +21,49 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-RISK_THRESHOLDS = {"low": 0.30, "medium": 0.60}  # below 0.30 = Low, 0.30-0.60 = Medium, above = High
+RISK_THRESHOLDS = {"low": 0.30, "medium": 0.60}
+
+# ---------------------------------------------------------------------------
+# THEMES — pure-Python palettes (Streamlit's native color-markdown + Plotly
+# colors). No CSS/HTML involved; switching is instant, no page reload.
+# ---------------------------------------------------------------------------
+THEMES = {
+    "Ocean Blue": {
+        "accent": "blue",
+        "icon": "🌊",
+        "gauge_bar": "#2563EB",
+        "gauge_zones": ["rgba(34,197,94,0.15)", "rgba(245,158,11,0.15)", "rgba(239,68,68,0.15)"],
+        "tab_icons": ["🧑", "💳", "🔁"],
+    },
+    "Sunset": {
+        "accent": "orange",
+        "icon": "🌅",
+        "gauge_bar": "#F97316",
+        "gauge_zones": ["rgba(250,204,21,0.18)", "rgba(251,146,60,0.18)", "rgba(220,38,38,0.18)"],
+        "tab_icons": ["🧑", "💳", "🔁"],
+    },
+    "Emerald": {
+        "accent": "green",
+        "icon": "🌿",
+        "gauge_bar": "#10B981",
+        "gauge_zones": ["rgba(16,185,129,0.15)", "rgba(234,179,8,0.15)", "rgba(239,68,68,0.15)"],
+        "tab_icons": ["🧑", "💳", "🔁"],
+    },
+    "Royal Violet": {
+        "accent": "violet",
+        "icon": "🔮",
+        "gauge_bar": "#8B5CF6",
+        "gauge_zones": ["rgba(34,197,94,0.15)", "rgba(139,92,246,0.15)", "rgba(239,68,68,0.15)"],
+        "tab_icons": ["🧑", "💳", "🔁"],
+    },
+    "Rose": {
+        "accent": "red",
+        "icon": "🌹",
+        "gauge_bar": "#EC4899",
+        "gauge_zones": ["rgba(34,197,94,0.15)", "rgba(236,72,153,0.15)", "rgba(220,38,38,0.15)"],
+        "tab_icons": ["🧑", "💳", "🔁"],
+    },
+}
 
 
 # ---------------------------------------------------------------------------
@@ -45,8 +87,6 @@ GEO_CATEGORIES = encoders["geo_categories"]
 
 
 def preprocess_single(record: dict) -> np.ndarray:
-    """Turn a raw form input dict into a scaled feature vector, in the exact
-    column order the model was trained on."""
     row = {
         "CreditScore": record["CreditScore"],
         "Gender": le_gender.transform([record["Gender"]])[0],
@@ -66,16 +106,16 @@ def preprocess_single(record: dict) -> np.ndarray:
     return scaler.transform(ordered)
 
 
-def risk_tier(prob: float) -> tuple[str, str]:
-    """Return (label, color) for a churn probability."""
+def risk_tier(prob: float) -> tuple[str, str, str]:
+    """Return (label, semantic_color_hex, streamlit_color_name) for a churn probability."""
     if prob < RISK_THRESHOLDS["low"]:
-        return "Low Risk", "#22C55E"
+        return "Low Risk", "#22C55E", "green"
     elif prob < RISK_THRESHOLDS["medium"]:
-        return "Medium Risk", "#F59E0B"
-    return "High Risk", "#EF4444"
+        return "Medium Risk", "#F59E0B", "orange"
+    return "High Risk", "#EF4444", "red"
 
 
-def make_gauge(prob: float, color: str) -> go.Figure:
+def make_gauge(prob: float, bar_color: str, zones: list, needle_color: str) -> go.Figure:
     fig = go.Figure(
         go.Indicator(
             mode="gauge+number",
@@ -83,16 +123,16 @@ def make_gauge(prob: float, color: str) -> go.Figure:
             number={"suffix": "%", "font": {"size": 40, "color": "#E6EDF3"}},
             gauge={
                 "axis": {"range": [0, 100], "tickcolor": "#8B949E", "tickfont": {"color": "#8B949E"}},
-                "bar": {"color": color, "thickness": 0.3},
+                "bar": {"color": bar_color, "thickness": 0.3},
                 "bgcolor": "#161B22",
                 "borderwidth": 0,
                 "steps": [
-                    {"range": [0, 30], "color": "rgba(34,197,94,0.15)"},
-                    {"range": [30, 60], "color": "rgba(245,158,11,0.15)"},
-                    {"range": [60, 100], "color": "rgba(239,68,68,0.15)"},
+                    {"range": [0, 30], "color": zones[0]},
+                    {"range": [30, 60], "color": zones[1]},
+                    {"range": [60, 100], "color": zones[2]},
                 ],
                 "threshold": {
-                    "line": {"color": color, "width": 3},
+                    "line": {"color": needle_color, "width": 3},
                     "thickness": 0.9,
                     "value": prob * 100,
                 },
@@ -109,18 +149,23 @@ def make_gauge(prob: float, color: str) -> go.Figure:
 
 
 # ---------------------------------------------------------------------------
-# SIDEBAR — branding & context
+# SIDEBAR — branding, theme switcher & context
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("### 📉 Churn Intelligence")
+    theme_name = st.selectbox("🎨 Dashboard Theme", list(THEMES.keys()), index=0)
+    theme = THEMES[theme_name]
+
+    st.markdown(f"### {theme['icon']} Churn Intelligence")
     st.caption("ANN-powered customer retention tool")
     st.divider()
-    st.markdown("**How it works**")
+
+    st.markdown(f":{theme['accent']}[**How it works**]")
     st.write(
         "This tool scores a customer's likelihood of churning using an "
         "Artificial Neural Network trained on historical banking customer data."
     )
-    st.markdown("**Risk tiers**")
+
+    st.markdown(f":{theme['accent']}[**Risk tiers**]")
     st.markdown("🟢 **Low** — under 30%")
     st.markdown("🟠 **Medium** — 30–60%")
     st.markdown("🔴 **High** — above 60%")
@@ -131,7 +176,7 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 # MAIN — header
 # ---------------------------------------------------------------------------
-st.markdown("## Customer Churn Prediction")
+st.markdown(f"## {theme['icon']} :{theme['accent']}[Customer Churn Prediction]")
 st.caption("Enter a customer's profile below to estimate their probability of churning.")
 st.divider()
 
@@ -139,9 +184,10 @@ st.divider()
 # INPUT FORM
 # ---------------------------------------------------------------------------
 with st.container(border=True):
-    st.markdown("#### Customer Profile")
+    st.markdown(f"#### :{theme['accent']}[Customer Profile]")
 
-    tab1, tab2, tab3 = st.tabs(["Demographics", "Account Details", "Engagement"])
+    icons = theme["tab_icons"]
+    tab1, tab2, tab3 = st.tabs([f"{icons[0]} Demographics", f"{icons[1]} Account Details", f"{icons[2]} Engagement"])
 
     with tab1:
         col1, col2 = st.columns(2)
@@ -169,7 +215,7 @@ with st.container(border=True):
             is_active = st.radio("Active Member?", ["Yes", "No"], horizontal=True)
 
     st.write("")
-    predict_clicked = st.button("Predict Churn Risk", use_container_width=True, type="primary")
+    predict_clicked = st.button("🔍 Predict Churn Risk", use_container_width=True, type="primary")
 
 # ---------------------------------------------------------------------------
 # RESULTS
@@ -189,18 +235,20 @@ if predict_clicked:
     }
     X = preprocess_single(record)
     prob = float(model.predict(X, verbose=0)[0][0])
-    label, color = risk_tier(prob)
+    label, hex_color, st_color = risk_tier(prob)
 
     st.write("")
     with st.container(border=True):
-        st.markdown("#### Prediction Result")
+        st.markdown(f"#### :{theme['accent']}[Prediction Result]")
         c1, c2 = st.columns([1, 1])
 
         with c1:
-            st.plotly_chart(make_gauge(prob, color), use_container_width=True, config={"displayModeBar": False})
+            fig = make_gauge(prob, theme["gauge_bar"], theme["gauge_zones"], hex_color)
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
         with c2:
-            st.markdown(f"##### :{'green' if label=='Low Risk' else 'orange' if label=='Medium Risk' else 'red'}[{label}]")
+            emoji = "🟢" if label == "Low Risk" else "🟠" if label == "Medium Risk" else "🔴"
+            st.markdown(f"##### {emoji} :{st_color}[{label}]")
             st.metric("Churn Probability", f"{prob*100:.1f}%")
             st.metric("Retention Probability", f"{(1-prob)*100:.1f}%")
 
